@@ -130,11 +130,15 @@ def search_youcom(query: str, max_results: int = 5) -> str:
     if not api_key:
         return "YDC_API_KEY environment variable not set."
 
+    # You.com Search API accepts `count` in the 1-100 range; clamp so
+    # out-of-range values don't trigger an HTTP 400.
+    count = max(1, min(int(max_results), 100))
+
     try:
         response = requests.post(
             "https://ydc-index.io/v1/search",
             headers={"X-API-Key": api_key, "Content-Type": "application/json"},
-            json={"query": query, "count": max_results},
+            json={"query": query, "count": count},
             timeout=30,
         )
         response.raise_for_status()
