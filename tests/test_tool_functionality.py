@@ -176,3 +176,18 @@ def test_search_youcom_handles_request_error(monkeypatch):
     monkeypatch.setattr(web_browsing.requests, "post", _fake_post)
     result = search_youcom("minion agent framework")
     assert result.startswith("Error fetching You.com search:")
+
+
+def test_search_youcom_non_numeric_max_results(monkeypatch):
+    """Test that a non-numeric max_results returns an error message instead of raising."""
+    from minion_agent.tools import web_browsing
+    from minion_agent.tools.web_browsing import search_youcom
+
+    monkeypatch.setenv("YDC_API_KEY", "test-key")
+
+    def _fail_post(url, headers=None, json=None, timeout=None):
+        raise AssertionError("requests.post should not be called for a bad max_results")
+
+    monkeypatch.setattr(web_browsing.requests, "post", _fail_post)
+    result = search_youcom("minion agent framework", max_results="many")
+    assert result.startswith("An unexpected error occurred:")
