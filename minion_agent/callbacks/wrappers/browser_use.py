@@ -36,7 +36,9 @@ class _BrowserUseWrapper:
                     context.shared["tool_description"] = "Browser automation action"
                     
                     for callback in agent.config.callbacks:
-                        context = callback.before_tool_execution(context, *args, **kwargs)
+                        context = await callback.before_tool_execution_async(
+                            context, *args, **kwargs
+                        )
 
                 output = await self._original_run_method(*args, **kwargs)
 

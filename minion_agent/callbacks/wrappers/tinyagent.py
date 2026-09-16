@@ -43,7 +43,7 @@ class _TinyAgentWrapper:
                 get_current_span().get_span_context().trace_id
             ]
             for callback in agent.config.callbacks:
-                context = callback.before_tool_execution(context, request)
+                context = await callback.before_tool_execution_async(context, request)
 
             output = await original_call(request)
 

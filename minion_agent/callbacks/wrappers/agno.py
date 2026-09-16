@@ -48,7 +48,9 @@ class _AgnoWrapper:
             ]
 
             for callback in agent.config.callbacks:
-                context = callback.before_tool_execution(context, *args, **kwargs)
+                context = await callback.before_tool_execution_async(
+                    context, *args, **kwargs
+                )
 
             result = await self._original_arun_function_call(*args, **kwargs)
 

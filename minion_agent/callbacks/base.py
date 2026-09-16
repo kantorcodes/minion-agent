@@ -22,6 +22,12 @@ class Callback:
         """Will be called before any Tool Execution starts."""
         return context
 
+    async def before_tool_execution_async(
+        self, context: Context, *args, **kwargs
+    ) -> Context:
+        """Async tool hook used by wrappers that execute tools on an event loop."""
+        return self.before_tool_execution(context, *args, **kwargs)
+
     def after_agent_invocation(self, context: Context, *args, **kwargs) -> Context:
         """Will be called once the Agent invocation ends."""
         return context

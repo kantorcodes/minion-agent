@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -44,6 +45,28 @@ def test_hol_guard_allows_explicitly_benign_command(monkeypatch):
             },
         )
     ]
+
+
+def test_hol_guard_async_path_offloads_evaluation(monkeypatch):
+    callback = HolGuardCallback()
+    context = _context()
+    guard_calls = _allow_guard(monkeypatch)
+    thread_calls = []
+
+    async def to_thread(func, *args, **kwargs):
+        thread_calls.append((func, args, kwargs))
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr("minion_agent.callbacks.hol_guard.asyncio.to_thread", to_thread)
+
+    result = asyncio.run(
+        callback.before_tool_execution_async(context, command="git status")
+    )
+
+    assert result is context
+    assert len(thread_calls) == 1
+    assert thread_calls[0][1] == ("git status",)
+    assert guard_calls[0][0][3] == "git status"
 
 
 def test_hol_guard_reads_tinyagent_positional_payload(monkeypatch):

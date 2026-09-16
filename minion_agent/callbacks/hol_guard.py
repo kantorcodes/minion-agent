@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 import subprocess
@@ -69,14 +70,15 @@ class HolGuardCallback(Callback):
 
         return list(dict.fromkeys(commands))
 
-    def before_tool_execution(self, context: Context, *args, **kwargs) -> Context:
+    def _extract_command(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
         commands = self._extract_commands(args, kwargs)
         if not commands:
-            return context
+            return None
         if len(commands) > 1:
             raise HolGuardBlocked("Multiple command values cannot be evaluated safely")
+        return commands[0]
 
-        command = commands[0]
+    def _evaluate_command(self, command: str) -> None:
         executable = shutil.which("hol-guard")
         if executable is None:
             raise HolGuardBlocked("HOL Guard is not installed")
@@ -106,6 +108,22 @@ class HolGuardCallback(Callback):
             and classification.get("explicitly_benign") is True
             and verdict.get("minimum_action") == "allow"
         ):
-            return context
+            return
 
         raise HolGuardBlocked("HOL Guard did not explicitly allow the command")
+
+    def before_tool_execution(self, context: Context, *args, **kwargs) -> Context:
+        command = self._extract_command(args, kwargs)
+        if command is None:
+            return context
+        self._evaluate_command(command)
+        return context
+
+    async def before_tool_execution_async(
+        self, context: Context, *args, **kwargs
+    ) -> Context:
+        command = self._extract_command(args, kwargs)
+        if command is None:
+            return context
+        await asyncio.to_thread(self._evaluate_command, command)
+        return context
