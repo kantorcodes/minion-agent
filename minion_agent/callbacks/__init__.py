@@ -1,9 +1,16 @@
 from .base import Callback
 from .context import Context
+from .hol_guard import HolGuardBlocked, HolGuardCallback
 from .span_cost import AddCostInfo
 from .span_print import ConsolePrintSpan
 
-__all__ = ["Callback", "ConsolePrintSpan", "Context"]
+__all__ = [
+    "Callback",
+    "ConsolePrintSpan",
+    "Context",
+    "HolGuardBlocked",
+    "HolGuardCallback",
+]
 
 
 def get_default_callbacks() -> list[Callback]:
