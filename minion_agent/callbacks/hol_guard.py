@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 from .base import Callback
 
@@ -33,19 +33,50 @@ class HolGuardCallback(Callback):
         self.command_fields = tuple(command_fields)
         self.timeout_seconds = timeout_seconds
 
-    def before_tool_execution(self, context: Context, *args, **kwargs) -> Context:
-        del args
-        command = next(
-            (
-                kwargs[field]
-                for field in self.command_fields
-                if isinstance(kwargs.get(field), str) and kwargs[field].strip()
-            ),
-            None,
-        )
-        if command is None:
-            return context
+    def _extract_commands(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> list[str]:
+        commands: list[str] = []
+        seen_containers: set[int] = set()
 
+        def visit(value: Any, depth: int = 0) -> None:
+            if depth > 2:
+                return
+
+            if isinstance(value, Mapping):
+                identity = id(value)
+                if identity in seen_containers:
+                    return
+                seen_containers.add(identity)
+
+                for field in self.command_fields:
+                    candidate = value.get(field)
+                    if isinstance(candidate, str) and candidate.strip():
+                        commands.append(candidate.strip())
+
+                for key in ("arguments", "args", "kwargs", "input"):
+                    nested = value.get(key)
+                    if isinstance(nested, Mapping):
+                        visit(nested, depth + 1)
+                return
+
+            for attribute in ("arguments", "args", "kwargs", "input"):
+                nested = getattr(value, attribute, None)
+                if isinstance(nested, Mapping):
+                    visit(nested, depth + 1)
+
+        visit(kwargs)
+        for arg in args:
+            visit(arg)
+
+        return list(dict.fromkeys(commands))
+
+    def before_tool_execution(self, context: Context, *args, **kwargs) -> Context:
+        commands = self._extract_commands(args, kwargs)
+        if not commands:
+            return context
+        if len(commands) > 1:
+            raise HolGuardBlocked("Multiple command values cannot be evaluated safely")
+
+        command = commands[0]
         executable = shutil.which("hol-guard")
         if executable is None:
             raise HolGuardBlocked("HOL Guard is not installed")
