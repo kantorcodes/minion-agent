@@ -106,3 +106,92 @@ def test_calculate_tool():
     # Test error handling
     assert calculate("1/0").startswith("Error calculating")
     assert calculate("invalid").startswith("Error calculating") 
+
+def test_search_youcom_missing_api_key(monkeypatch):
+    """Test that search_youcom returns a clear message when YDC_API_KEY is not set."""
+    from minion_agent.tools.web_browsing import search_youcom
+
+    monkeypatch.delenv("YDC_API_KEY", raising=False)
+    result = search_youcom("minion agent framework")
+    assert result == "YDC_API_KEY environment variable not set."
+
+
+def test_search_youcom_formats_results(monkeypatch):
+    """Test that search_youcom formats API results the same way as search_tavily."""
+    from minion_agent.tools import web_browsing
+    from minion_agent.tools.web_browsing import search_youcom
+
+    monkeypatch.setenv("YDC_API_KEY", "test-key")
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {
+                "results": {
+                    "web": [
+                        {
+                            "title": "Minion Agent",
+                            "url": "https://example.com/minion",
+                            "description": "A simple agent framework.",
+                            "snippets": [],
+                        },
+                        {
+                            "title": "Second result",
+                            "url": "https://example.com/two",
+                            "description": "Fallback description.",
+                            "snippets": ["Another snippet."],
+                        },
+                    ]
+                }
+            }
+
+    def _fake_post(url, headers=None, json=None, timeout=None):
+        assert url == "https://ydc-index.io/v1/search"
+        assert headers["X-API-Key"] == "test-key"
+        assert (json or {})["query"] == "minion agent framework"
+        return _FakeResponse()
+
+    monkeypatch.setattr(web_browsing.requests, "post", _fake_post)
+    result = search_youcom("minion agent framework")
+    assert "[Minion Agent](https://example.com/minion)" in result
+    assert "A simple agent framework." in result
+    assert "[Second result](https://example.com/two)" in result
+    assert "Another snippet." in result
+
+
+def test_search_youcom_handles_request_error(monkeypatch):
+    """Test that search_youcom returns an error message instead of raising."""
+    from requests.exceptions import ConnectionError as RequestsConnectionError
+
+    from minion_agent.tools import web_browsing
+    from minion_agent.tools.web_browsing import search_youcom
+
+    monkeypatch.setenv("YDC_API_KEY", "test-key")
+
+    def _fake_post(url, headers=None, json=None, timeout=None):
+        raise RequestsConnectionError("no network")
+
+    monkeypatch.setattr(web_browsing.requests, "post", _fake_post)
+    result = search_youcom("minion agent framework")
+    assert result.startswith("Error fetching You.com search:")
+
+
+def test_search_youcom_non_numeric_max_results(monkeypatch):
+    """Test that a non-numeric max_results returns an error message instead of raising."""
+    from minion_agent.tools import web_browsing
+    from minion_agent.tools.web_browsing import search_youcom
+
+    monkeypatch.setenv("YDC_API_KEY", "test-key")
+
+    post_called = {"called": False}
+
+    def _fail_post(url, headers=None, json=None, timeout=None):
+        post_called["called"] = True
+        return None
+
+    monkeypatch.setattr(web_browsing.requests, "post", _fail_post)
+    result = search_youcom("minion agent framework", max_results="many")
+    assert result.startswith("An unexpected error occurred:")
+    assert not post_called["called"], "requests.post should not be called for a bad max_results"

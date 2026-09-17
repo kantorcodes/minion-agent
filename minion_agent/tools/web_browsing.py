@@ -109,3 +109,51 @@ def search_tavily(query: str, include_images: bool = False) -> str:
         return "\n\n".join(output) if output else "No results found."
     except Exception as e:
         return f"Error performing Tavily search: {e!s}"
+
+
+def search_youcom(query: str, max_results: int = 5) -> str:
+    """Perform a You.com web search based on your query and return the top search results.
+
+    Uses the You.com Search API (https://you.com/docs/api-reference/search).
+    Requires the YDC_API_KEY environment variable (get a key at
+    https://you.com/platform/api-keys).
+
+    Args:
+        query (str): The search query to perform.
+        max_results (int): The maximum number of results to return (default=5).
+
+    Returns:
+        The top search results as a formatted string.
+
+    """
+    api_key = os.getenv("YDC_API_KEY")
+    if not api_key:
+        return "YDC_API_KEY environment variable not set."
+
+    try:
+        # You.com Search API accepts `count` in the 1-100 range; clamp so
+        # out-of-range values don't trigger an HTTP 400. The conversion sits
+        # inside the try so a non-numeric max_results degrades to a returned
+        # error message instead of an unhandled exception.
+        count = max(1, min(int(max_results), 100))
+        response = requests.post(
+            "https://ydc-index.io/v1/search",
+            headers={"X-API-Key": api_key, "Content-Type": "application/json"},
+            json={"query": query, "count": count},
+            timeout=30,
+        )
+        response.raise_for_status()
+        web_results = response.json().get("results", {}).get("web", [])
+        output = []
+        for result in web_results:
+            description = result.get("description", "")
+            snippets = result.get("snippets") or []
+            snippet = snippets[0] if snippets else description
+            output.append(
+                f"[{result.get('title', 'No Title')}]({result.get('url', '#')})\n{snippet}"
+            )
+        return "\n\n".join(output) if output else "No results found."
+    except RequestException as e:
+        return f"Error fetching You.com search: {e!s}"
+    except Exception as e:
+        return f"An unexpected error occurred: {e!s}"
