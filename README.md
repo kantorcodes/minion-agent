@@ -175,6 +175,25 @@ tools=[
 ]
 ```
 
+## Web Search Tools
+
+`minion_agent.tools` ships a few optional web search helpers that can be passed to an agent like any other tool:
+
+- `search_web` — DuckDuckGo search (requires `duckduckgo_search`)
+- `search_tavily` — Tavily search (requires `tavily-python` and `TAVILY_API_KEY`)
+- `search_youcom` — You.com search (requires `YDC_API_KEY`, get one at [you.com/platform/api-keys](https://you.com/platform/api-keys))
+
+```python
+from minion_agent.tools import search_youcom
+
+agent_config = AgentConfig(
+    # ... other config options ...
+    tools=[search_youcom],
+)
+```
+
+If the environment variable is not set, the tool returns a message saying so instead of raising.
+
 ## Planning Support in smolagents
 
 You can enable automatic planning by setting the `planning_interval` in `agent_args` (smolagents) :
