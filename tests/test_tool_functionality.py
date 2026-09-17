@@ -185,9 +185,13 @@ def test_search_youcom_non_numeric_max_results(monkeypatch):
 
     monkeypatch.setenv("YDC_API_KEY", "test-key")
 
+    post_called = {"called": False}
+
     def _fail_post(url, headers=None, json=None, timeout=None):
-        raise AssertionError("requests.post should not be called for a bad max_results")
+        post_called["called"] = True
+        return None
 
     monkeypatch.setattr(web_browsing.requests, "post", _fail_post)
     result = search_youcom("minion agent framework", max_results="many")
     assert result.startswith("An unexpected error occurred:")
+    assert not post_called["called"], "requests.post should not be called for a bad max_results"
